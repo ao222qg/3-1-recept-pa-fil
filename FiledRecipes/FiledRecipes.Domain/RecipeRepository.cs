@@ -127,5 +127,114 @@ namespace FiledRecipes.Domain
                 handler(this, e);
             }
         }
+        public void Load()                              
+        {
+            List<IRecipe> recipes = new List<IRecipe>();
+
+            using (StreamReader read = new StreamReader(_path)) // instansierar nytt streamreader objekt.
+            {
+                string reader;
+                Recipe FullRecipe = null;
+                RecipeReadStatus RecipeEnum = RecipeReadStatus.Indefinite; // ett enum, Indefinite, New, Ingredient, Instruction
+
+
+                while ((reader = read.ReadLine()) != null) 
+                {
+                    if (reader != "") // kollar om tomt 
+                    {
+                        if (reader == SectionRecipe)
+                        {
+                            RecipeEnum = RecipeReadStatus.New;
+                        }
+
+                        else if (reader == SectionIngredients)
+                        {
+                            RecipeEnum = RecipeReadStatus.Ingredient;
+                        }
+
+                        else if (reader == SectionInstructions)
+                        {
+                            RecipeEnum = RecipeReadStatus.Instruction;
+                        }
+
+
+                        else
+                        {
+                            switch (RecipeEnum)
+                            {
+
+                                case RecipeReadStatus.New:
+
+                                    FullRecipe = new Recipe(reader);                // skapar ett nytt objekt varje gång den läser in 
+                                    recipes.Add(FullRecipe);                        // ett nytt recept namn.
+                                    break;
+
+                                case RecipeReadStatus.Ingredient:
+
+                                    string[] ingredients = reader.Split(new char[] { ';' }, StringSplitOptions.None); // tar bort comman frå n den inlästa strängen
+
+                                    if (ingredients.Length % 3 != 0)
+                                    {
+                                        throw new FileFormatException();
+                                    }
+
+                                    Ingredient ingredient = new Ingredient();
+                                    ingredient.Amount = ingredients[0];            //1:a värdet i arrayen = mängden
+                                    ingredient.Measure = ingredients[1];            //2:a värdet i arrayen = måttet
+                                    ingredient.Name = ingredients[2];               //3:e värdet i arrayen = namnet
+
+                                    FullRecipe.Add(ingredient);
+                                    break;
+
+
+                                case RecipeReadStatus.Instruction:
+
+                                    FullRecipe.Add(reader);
+                                    break;
+
+                                case RecipeReadStatus.Indefinite:
+                                    throw new FileFormatException();
+                            }
+                        }
+                    }
+                }
+                recipes.TrimExcess();
+
+                _recipes = recipes.OrderBy(recipe => recipe.Name).ToList();
+
+                IsModified = false;
+
+                OnRecipesChanged(EventArgs.Empty); //Utlöser händelse om att recept har lästs in
+            }
+        }
+
+        public void Save()
+        {
+            using (StreamWriter writer = new StreamWriter(_path))
+            {
+                foreach (IRecipe recipe in _recipes)  //för var recept i listan
+                {
+                    writer.WriteLine(SectionRecipe);
+                    writer.WriteLine(recipe.Name);   // skriver in recept namn
+
+                    writer.WriteLine(SectionIngredients);
+                    foreach (IIngredient ingredient in recipe.Ingredients) //skriver in ingredienser
+                    {
+                        writer.WriteLine("{0};{1};{2}", ingredient.Amount, ingredient.Measure, ingredient.Name);
+                    }
+
+                    writer.WriteLine(SectionInstructions);
+                    foreach (string details in recipe.Instructions) //skriver in instruktioner
+                    {
+                        writer.WriteLine(details);
+                    }
+                }
+                IsModified = false;
+
+                OnRecipesChanged(EventArgs.Empty);
+            }
+        }
     }
 }
+                                                 
+            
